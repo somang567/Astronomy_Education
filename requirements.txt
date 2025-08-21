@@ -1,0 +1,8 @@
+Flask
+Jinja2
+psycopg2-binary
+SQLAlchemy
+Flask-SQLAlchemy
+python-dotenv
+requests
+Flask-CORS
