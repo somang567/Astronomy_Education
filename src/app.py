@@ -8,7 +8,7 @@ def create_app():
     
     @app.route("/")
     def mainPage():
-        return render_template("index.html")
+        return render_template("home/main.html")
     
     # BLUEPRINT 등록
     app.register_blueprint(test_blueprint, url_prefix="/api")
