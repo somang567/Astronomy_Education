@@ -1,0 +1,37 @@
+.footer {
+  font-size: 14px;
+  color: #333;
+}
+
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-links a {
+  color: #333;
+  text-decoration: none;
+  margin: 0 5px;
+}
+
+.footer-links a:hover {
+  text-decoration: underline;
+}
+
+.footer-info {
+  max-width: 70%;
+}
+
+.footer-icons a img {
+  width: 40px;
+  height: 40px;
+  transition: transform 0.2s;
+}
+.footer-icons img:hover {
+  transform: scale(1.1);
+}
+
+.pernalSecurity {
+  font-weight: 800;
+}

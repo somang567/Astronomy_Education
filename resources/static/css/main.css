@@ -1,0 +1,14 @@
+body {
+    background-color: #212529; /* dark gray background */
+    color: #f8f9fa; /* light text color */
+}
+.container-fluid.bg-dark {
+    background-color: #343a40 !important;
+}
+.card {
+    background-color: #2c3034; /* darker card background */
+    border-color: #495057;
+}
+.card-header, .card-body {
+    color: #f8f9fa;
+}

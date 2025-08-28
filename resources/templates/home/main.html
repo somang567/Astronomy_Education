@@ -1,9 +1,157 @@
 {% extends "layouts/layout.html" %}
 
-{% block title %}Home Page{% endblock %}
+{% block title %}Slit Viewer Simulator{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+{% endblock %}
 
 {% block content %}
-  <h2>Welcome to the Main Page</h2>
-  <p>This page uses layout.html with separate header and footer files.</p>
-  <button class="btn btn-success">Click Me</button>
+<div class="container-fluid py-4">
+        
+  <!-- Controls Section -->
+  <div class="card bg-dark mb-4">
+      <div class="card-body d-flex flex-column flex-md-row align-items-center justify-content-between">
+          <div class="d-flex align-items-center flex-wrap">
+              <button id="upload-button" class="btn btn-primary me-3 my-1">파일 업로드</button>
+              
+              <input id="file-input" type="file" accept=".fits,.fts" style="display:none;">
+
+              <div class="text-white-50 my-1 me-3">[슬라이스 이동 슬라이더]</div>
+              <div class="text-white-50 my-1">[보정 방식 토글]</div>
+          </div>
+          <div class="text-white-50 my-1">
+              <span class="fw-bold">현재 상태:</span> <span id="current-status">준비 완료</span>
+          </div>
+      </div>
+  </div>
+
+  <!-- Viewer & Slit/Spectrum Section -->
+  <div class="row g-4">
+      <!-- Left Panel: FITS Image Viewer -->
+      <div class="col-md-6">
+          <div class="card h-100">
+              <div class="card-header fw-bold text-center">FITS 이미지 뷰어 (Slit Preview)</div>
+              <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                  <div id="fits-image-container" class="w-100 h-100 text-center text-white-50 p-4" style="background-color: #3e444a;">
+                      이미지를 업로드하세요
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- Right Panel: Slit & Spectrum -->
+      <div class="col-md-6 d-flex flex-column">
+          <!-- Top: Corrected Slit Image -->
+          <div class="card mb-4 flex-grow-1">
+              <div class="card-header fw-bold text-center">보정된 Slit 이미지</div>
+              <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                  <div id="slit-image-container" class="w-100 h-100 text-center text-white-50 p-4" style="background-color: #3e444a;">
+                      픽셀을 클릭하여 Slit 이미지를 확인하세요
+                  </div>
+              </div>
+          </div>
+
+          <!-- Bottom: Spectrum Plot -->
+          <div class="card flex-grow-1">
+              <div class="card-header fw-bold text-center">선택 픽셀의 Spectrum</div>
+              <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                  <div id="spectrum-plot-container" class="w-100 h-100 text-center text-white-50 p-4" style="background-color: #3e444a;">
+                      스펙트럼 그래프가 여기에 표시됩니다
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+  
+  <!-- Footer Information as part of the main content -->
+  <div class="row mt-4">
+      <div class="col-12">
+          <div class="card bg-dark">
+              <div class="card-body d-flex justify-content-between align-items-center text-sm text-white-50">
+                  <div>
+                      <span class="fw-bold">현재 파일명:</span> <span id="current-filename">없음</span>
+                  </div>
+                  <div>
+                      <span class="fw-bold">헤더 메타데이터:</span> <span id="header-metadata">없음</span>
+                  </div>
+                  <div>
+                      <span class="fw-bold">현재 픽셀 좌표:</span> <span id="current-pixel-coords">x: -, y: -</span>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
 {% endblock %}
+
+{% block script %}
+    /<!-- 상태 메시지 상수를 별도 파일에서 불러옵니다. -->
+    <script type="module">
+        import { STATUS_MESSAGES } from "{{ url_for('static', filename='js/status.js') }}";
+
+        // UI 업데이트를 위한 함수
+        function updateStatus(message) {
+            const statusElement = document.getElementById('current-status');
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+        }
+
+        // DOM 요소 가져오기
+        const uploadButton = document.getElementById('upload-button');
+        const fileInput = document.getElementById('file-input');
+
+        // '파일 업로드' 버튼 클릭 시 숨겨진 파일 입력 필드 클릭 트리거
+        uploadButton.addEventListener('click', () => {
+            console.log("File upload button clicked!"); // 디버깅을 위한 로그
+            fileInput.click();
+        });
+
+        // 파일 입력 필드에 파일이 선택되면 실행
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            // 상태 메시지 업데이트
+            updateStatus(STATUS_MESSAGES.UPLOADING);
+
+            // FormData 객체 생성 및 파일 추가
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/fits/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(STATUS_MESSAGES.UPLOAD_SUCCESS);
+                    document.getElementById('current-filename').textContent = file.name;
+                    // TODO: FITS 데이터를 처리하고 이미지 뷰어에 표시하는 로직 추가
+                } else {
+                    updateStatus(STATUS_MESSAGES.UPLOAD_FAIL);
+                    console.error("Upload failed:", result.error);
+                }
+            } catch (error) {
+                updateStatus(STATUS_MESSAGES.UPLOAD_FAIL);
+                console.error("Network error:", error);
+            }
+        });
+        
+        // 이미지 컨테이너에 클릭 이벤트 리스너 추가 (예시)
+        document.getElementById('fits-image-container').addEventListener('click', (event) => {
+            // 여기에 실제 스펙트럼 추출 로직 추가
+            // ...
+            const x = event.offsetX;
+            const y = event.offsetY;
+            updateStatus(STATUS_MESSAGES.EXTRACTING_SPECTRUM);
+        });
+    </script>
+{% endblock %}
+
