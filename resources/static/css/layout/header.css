@@ -1,5 +1,5 @@
   /* header.css의 스타일 적용 */
-  .headerWrapper {
+.headerWrapper {
     width: 90%;
     position: relative;
     display: flex;
