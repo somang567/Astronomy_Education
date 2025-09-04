@@ -1,76 +1,119 @@
-# app/controller/fits_controller.py
-import os
-from flask import Blueprint, request , jsonify
-from src.services.fits_service import read_fits
-
+from __future__ import annotations
+import os, base64, uuid, traceback
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.utils import secure_filename
+from src.services import fits_service
 
 fits_bp = Blueprint("fits", __name__)
-UPLOAD_FOLDER = "uploads"
-CACHE = {}
 
-# [ 직접 샘플 긁어오는 용도 ]
-# @fits_bp.route("/fits")
-# def get_fits_data():
-#     # List of FITS file paths to process.
-#     # IMPORTANT: Ensure these paths are correct on your local machine.
-#     file_paths = [
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20241106_225310.658925_l1.fts",
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20241106_225543.130151_l1.fts",
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20241106_225815.343815_l1.fts",
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20250810_212509.482436.fits",
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20250810_212745.502083.fits",
-#         "/Users/juntk/Desktop/Astronomical Research Institute Data/Data/internship_challan_app/nxst_20250810_213021.521724.fits",
-#     ]
-    
-#     results = []
-    
-#     for file_path in file_paths:
-#         try:
-#             # Check if the file exists before attempting to open it.
-#             if not os.path.exists(file_path):
-#                 results.append({
-#                     "file_path": file_path,
-#                     "error": "File not found."
-#                 })
-#                 continue
-            
-#             # Read FITS data and header.
-#             data, header = read_fits(file_path)
-            
-#             results.append({
-#                 "file_path": file_path,
-#                 "shape": data.shape if data is not None else None,
-#                 "header": dict(header)
-#             })
-            
-#         except Exception as e:
-#             # Catch all exceptions and report the error message.
-#             results.append({
-#                 "file_path": file_path,
-#                 "error": f"Failed to process file: {str(e)}"
-#             })
-            
-#     return jsonify(results)
+ALLOWED_EXT = {".fits", ".fts", ".fit"}
+
+def _b64(png: bytes) -> str:
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+# 업로드 경로
+def _uploads_dir() -> str:
+    root = current_app.root_path
+    updir = os.path.join(root, "..", "uploads")
+    updir = os.path.abspath(updir)
+    os.makedirs(updir, exist_ok=True)
+    return updir
+
+# 파일 업로드 후 다른 fits 파일을 새로 업로드 할 경우 기존 업로드 파일삭제
+def _clear_uploads():
+    upload_dir = _uploads_dir()
+    for f in os.listdir(upload_dir):
+        fp = os.path.join(upload_dir, f)
+        try:
+            os.remove(fp)
+            print(f"[삭제됨] {fp}")
+        except Exception as e:
+            print(f"[삭제 실패] {fp}: {e}")
 
 @fits_bp.route("/upload", methods=["POST"])
-def upload_fits():
-    if "file" not in request.files: return jsonify({"error":"파일 없음"}), 400
-    f = request.files["file"]
-    if not f.filename: return jsonify({"error":"파일명 없음"}), 400
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    path = os.path.join(UPLOAD_DIR, f.filename)
-    f.save(path)
+def upload():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "파일이 없습니다"}), 400
+        f = request.files["file"]
+        if not f or not f.filename:
+            return jsonify({"error": "파일명이 비어있습니다"}), 400
 
-    file_id, preview_png_b64, meta = load_fits_preview(path)   # ndarray 캐시 + PNG base64 생성
-    CACHE[file_id] = meta  # 필요 시 ndarray는 services 내부 전역 캐시에 둬도 OK (메모리 관리 포함)
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ALLOWED_EXT and ext not in ALLOWED_EXT:
+            return jsonify({"error": f"허용되지 않은 확장자({ext})"}), 400
 
-    return jsonify({
-        "file_id": file_id,
-        "filename": f.filename,
-        "preview_png": preview_png_b64,  # "data:image/png;base64,...."
-        "width": meta["width"], "height": meta["height"],
-        "header": meta["header"]
-    })
+        # 🔥 이전 업로드 파일 정리
+        _clear_uploads()
 
-    
+        base = secure_filename(os.path.basename(f.filename)) or "upload.fits"
+        unique = f"{uuid.uuid4().hex[:8]}_{base}"
+        upload_dir = _uploads_dir()
+        path = os.path.join(upload_dir, unique)
+        f.save(path)
 
+        file_id, shape, header = fits_service.register_fits(path)
+        png, w, h = fits_service.load_preview(file_id)
+
+        return jsonify({
+            "file_id": file_id,
+            "filename": base,
+            "saved_as": unique,
+            "shape": list(shape) if shape else None,
+            "header": header,
+            "preview_png": _b64(png),
+            "width": w,
+            "height": h,
+        })
+    except Exception as e:
+        return jsonify({
+            "error": f"업로드 실패: {type(e).__name__}: {e}",
+            "trace": traceback.format_exc(limit=3),
+        }), 500
+
+@fits_bp.route("/preview", methods=["GET"])
+def preview():
+    file_id = request.args.get("file_id")
+    z = request.args.get("z", type=int)
+    percent_clip = request.args.get("percent_clip", default=1.0, type=float)
+    apply_correction = request.args.get("apply_correction", default="true").lower() == "true"
+    if not file_id:
+        return jsonify({"error": "file_id가 필요합니다"}), 400
+    try:
+        png, w, h = fits_service.load_preview(file_id, z=z, percent_clip=percent_clip, apply_correction=apply_correction)
+        return jsonify({"preview_png": _b64(png), "width": w, "height": h})
+    except Exception as e:
+        return jsonify({"error": f"프리뷰 실패: {type(e).__name__}: {e}"}), 500
+
+@fits_bp.route("/slit", methods=["GET"])
+def slit():
+    file_id = request.args.get("file_id")
+    x = request.args.get("x", type=int)
+    percent_clip = request.args.get("percent_clip", default=1.0, type=float)
+    apply_correction = request.args.get("apply_correction", default="true").lower() == "true"
+    if not file_id or x is None:
+        return jsonify({"error": "file_id, x 가 필요합니다"}), 400
+    try:
+        png, w, h = fits_service.get_slit_image(file_id, x, percent_clip=percent_clip, apply_correction=apply_correction)
+        return jsonify({"slit_png": _b64(png), "width": w, "height": h})
+    except Exception as e:
+        return jsonify({"error": f"슬릿 생성 실패: {type(e).__name__}: {e}"}), 500
+
+@fits_bp.route("/spectrum", methods=["GET"])
+def spectrum():
+    file_id = request.args.get("file_id")
+    x = request.args.get("x", type=int)
+    y = request.args.get("y", type=int)
+    apply_correction = request.args.get("apply_correction", default="true").lower() == "true"
+    if not file_id or x is None or y is None:
+        return jsonify({"error": "file_id, x, y 가 필요합니다"}), 400
+    try:
+        lam, spec = fits_service.get_spectrum(file_id, x, y, apply_correction=apply_correction)
+        return jsonify({
+            "wavelength": lam.tolist(),
+            "intensity": spec.tolist(),
+            "x": x,
+            "y": y,
+        })
+    except Exception as e:
+        return jsonify({"error": f"스펙트럼 추출 실패: {type(e).__name__}: {e}"}), 500

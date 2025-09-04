@@ -6,3 +6,7 @@ Flask-SQLAlchemy
 python-dotenv
 requests
 Flask-CORS
+astropy
+numpy
+pillow
+matplotlib
