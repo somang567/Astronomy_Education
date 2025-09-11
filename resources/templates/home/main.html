@@ -1,93 +1,94 @@
 {% extends "layouts/layout.html" %}
-
 {% block title %}Slit Viewer Simulator{% endblock %}
 
-{% block css %}
+{% block styles %}
   {{ super() }}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-xxl my-4">
 
-  <!-- Controls -->
-  <div class="card bg-dark mb-4">
-    <div class="card-body d-flex flex-column flex-md-row align-items-center justify-content-between">
-      <div class="d-flex align-items-center flex-wrap">
-        <button id="upload-button" class="btn btn-primary me-3 my-1">파일 업로드</button>
-        <input id="file-input" type="file" accept=".fits,.fts" style="display:none;">
-
-        <div class="d-flex align-items-center my-1 me-3" id="z-slider-wrap" style="display:none;">
-          <label for="z-slider" class="text-white-50 me-2 mb-0">슬라이스:</label>
-          <input id="z-slider" type="range" min="0" max="0" value="0" step="1" style="width:200px">
-          <span id="z-value" class="text-white-50 ms-2">0</span>
-        </div>
-
-        <div class="form-check form-switch my-1">
-          <input class="form-check-input" type="checkbox" id="clip-toggle" checked>
-          <label class="form-check-label text-white-50" for="clip-toggle">보정(클리핑)</label>
-        </div>
+  <!-- 메타 정보 + 상태 배지 -->
+  <div class="row align-items-center g-2 mb-2 meta-row">
+    <!-- 왼쪽: 파일/메타/좌표 -->
+    <div class="col-12 col-lg-6">
+      <div class="d-flex flex-wrap gap-3 medium text-muted" style="font-size: 1.2rem;">
+        <span>FileName: <span id="fitsFileName">없음</span></span>
+        <span>Meta Data: <span id="fitsMeta">없음</span></span>
+        <span>Pixel Point: x: <span id="px">-</span>, y: <span id="py">-</span></span>
       </div>
-
-      <div class="text-white-50 my-1">
-        <span class="fw-bold">현재 상태:</span> <span id="current-status">준비 완료</span>
-      </div>
+    </div>
+    <!-- 오른쪽: 상태 배지 -->
+    <div class="col-12 col-lg-6 text-lg-end">
+      <span class="status-label">상태:</span>
+      <span id="statusBadge"
+            class="badge bg-success-subtle text-success border border-success-subtle status-badge">
+        준비 완료
+      </span>
     </div>
   </div>
 
-  <!-- Viewer & Slit/Spectrum -->
   <div class="row g-4">
-    <!-- FITS 이미지 -->
-    <div class="col-md-6 d-flex">
-      <div class="card flex-grow-1 h-100">
-        <div class="card-header fw-bold text-center">FITS 이미지 뷰어</div>
-        <div class="card-body d-flex">
-          <div class="ratio ratio-1x1 flex-grow-1">
-            <div id="fits-image-container" class="bg-body-tertiary rounded-3 fit-contain"></div>
-          </div>
-        </div>
+    <!-- Fits Image View -->
+<section class="col-12 col-lg-6">
+  <div class="card border-0 shadow-sm h-100 rounded-4">
+    <div class="card-header bg-white border-0 pt-4 pb-0">
+      <!-- 👇 한 줄 래퍼로 묶기 -->
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">FITS</span>
+        <h6 class="fw-semibold mb-0">Fits Image View</h6>
       </div>
+      <p class="small text-muted mb-0 mt-2">이미지를 클릭하면 좌표가 표시됩니다.</p>
     </div>
-
-    <!-- Slit & Spectrum -->
-    <div class="col-md-6 d-flex flex-column">
-      <div class="card mb-4 flex-grow-1 h-100">
-        <div class="card-header fw-bold text-center">Slit 이미지</div>
-        <div class="card-body d-flex">
-          <div class="ratio ratio-1x1 flex-grow-1">
-            <div id="slit-image-container" class="bg-body-tertiary rounded-3 fit-contain"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card flex-grow-1 h-100">
-        <div class="card-header fw-bold text-center">Spectrum</div>
-        <div class="card-body d-flex">
-          <div class="ratio ratio-16x9 flex-grow-1">
-            <div id="spectrum-plot-container" class="bg-body-tertiary rounded-3 fit-contain"></div>
-          </div>
-        </div>
+    <div class="card-body">
+      <div class="viewer-frame">
+        <canvas id="fitsCanvas" class="viewer-canvas"></canvas>
       </div>
     </div>
   </div>
+</section>
 
-  <!-- Footer info -->
-  <div class="row mt-4">
-    <div class="col-12">
-      <div class="card bg-dark">
-        <div class="card-body d-flex flex-wrap gap-3 justify-content-between align-items-center text-white-50">
-          <div><span class="fw-bold">현재 파일명:</span> <span id="current-filename">없음</span></div>
-          <div><span class="fw-bold">헤더 메타데이터:</span> <span id="header-metadata">없음</span></div>
-          <div><span class="fw-bold">현재 픽셀 좌표:</span> <span id="current-pixel-coords">x: -, y: -</span></div>
-        </div>ㅎ
+<!-- Slit Image View -->
+<section class="col-12 col-lg-6">
+  <div class="card border-0 shadow-sm h-100 rounded-4">
+    <div class="card-header bg-white border-0 pt-4 pb-0">
+      <!-- 👇 한 줄 래퍼로 묶기 -->
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">SLIT</span>
+        <h6 class="fw-semibold mb-0">Slit Image View</h6>
+      </div>
+      <p class="small text-muted mb-0 mt-2">보정/슬라이스 상태에 따라 슬릿이 갱신됩니다.</p>
+    </div>
+    <div class="card-body">
+      <div class="viewer-frame">
+        <canvas id="slitCanvas" class="viewer-canvas"></canvas>
       </div>
     </div>
   </div>
+</section>
 
+    <!-- Slit Spectrum -->
+    <section class="col-12">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white border-0 pt-4 pb-0 d-flex align-items-center gap-2">
+          <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">SPECTRUM</span>
+          <h6 class="fw-semibold mb-0">SLIT SPECTRUM</h6>
+        </div>
+        <div class="card-body">
+          <div class="spectrum-frame">
+            <canvas id="spectrumCanvas" class="viewer-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 </div>
 {% endblock %}
 
-{% block script %}
-  {{ super() }}
-  <script type="module" src="{{ url_for('static', filename='js/mainViewer.js') }}"></script>
+{% block scripts %}
+  <!-- 순서 중요: Chart.js → 뷰어 → 헤더 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='js/mainViewer.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/header.js') }}" defer></script>
 {% endblock %}

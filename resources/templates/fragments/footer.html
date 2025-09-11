@@ -1,6 +1,5 @@
-<footer class="footer bg-light pt-4 mt-5 border-top">
-  <div class="container">
-    
+<footer class="footer bg-gray pt-4 mt-5 border-top">  
+  <div class="container-xxl">
     <!-- 상단 메뉴 + FAMILY SITE -->
     <div class="footer-top d-flex justify-content-between align-items-center mb-3">
       <!-- 왼쪽 메뉴 -->
@@ -19,7 +18,7 @@
                 id="familySiteMenu" data-bs-toggle="dropdown" aria-expanded="false">
           FAMILY SITE
         </button>
-        <ul class="dropdown-menu" aria-labelledby="familySiteMenu">
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="familySiteMenu">
           <li><a class="dropdown-item" href="https://astro.kasi.re.kr/index">천문우주지식정보</a></li>
           <li><a class="dropdown-item" href="https://www.kasi.re.kr/boao/">보현산천문대</a></li>
           <li><a class="dropdown-item" href="https://www.kasi.re.kr/soao/">소백산천문대</a></li>
@@ -30,25 +29,32 @@
     </div>
 
     <!-- 주소 및 연락처 -->
-    <div class="footer-info small text-muted mb-2">
+    <div class="footer-info medium text-muted mb-2">
       (34055) 대전광역시 유성구 대덕대로 776<br>
       전화: 080-373-3333(무료) / 042-865-3333(유료) <br>
       천문정보 ARS: 042-865-3332 | 팩스: 042-861-5610<br>
     </div>
 
-    <!-- 저작권 + 아이콘 (같은 줄) -->
-    <div class="footer-bottom d-flex justify-content-between align-items-center small text-muted">
-      <div>
-        Copyright (C) Korea Astronomy and Space Science Institute. 
-        All Rights Reserved.
+    <!-- 하단: 좌(카피) / 우(아이콘) -->
+    <div class="footer-bottom d-flex align-items-center justify-content-between pt-2">
+      <div class="medium text-muted">
+        Copyright (C) Korea Astronomy and Space Science Institute. All Rights Reserved.
       </div>
-      <div class="footer-icons d-flex gap-3">
-        <a href="https://www.facebook.com/kasipr"><img src="{{ url_for('static', filename='images/facebook.svg') }}" alt="Facebook"></a>
-        <a href="https://x.com/kasi_news"><img src="{{ url_for('static', filename='images/x.png') }}" alt="Twitter/X" class="x"></a>
-        <a href="https://www.youtube.com/channel/UCWJ44iAM9yNi6eEIpNii_LQ"><img src="{{ url_for('static', filename='images/youtube.svg') }}" alt="YouTube"></a>
-        <a href="https://www.copyright.or.kr/gov/nuri/rule_info/index.do"><img src="{{ url_for('static', filename='images/Goverment.svg') }}" alt="Open"></a>
+
+      <div class="footer-icons d-flex align-items-center gap-3">
+        <a href="https://www.facebook.com/kasipr" aria-label="Facebook">
+          <img src="{{ url_for('static', filename='images/facebook.svg') }}" alt="Facebook" width="28" height="28">
+        </a>
+        <a href="https://x.com/kasi_news" aria-label="X">
+          <img src="{{ url_for('static', filename='images/x.png') }}" alt="X" width="28" height="28">
+        </a>
+        <a href="https://www.youtube.com/channel/UCWJ44iAM9yNi6eEIpNii_LQ" aria-label="YouTube">
+          <img src="{{ url_for('static', filename='images/youtube.svg') }}" alt="YouTube" width="28" height="28">
+        </a>
+        <a href="https://www.copyright.or.kr/gov/nuri/rule_info/index.do" aria-label="Open">
+          <img src="{{ url_for('static', filename='images/Goverment.svg') }}" alt="Open" width="28" height="28">
+        </a>
       </div>
     </div>
-
   </div>
 </footer>
