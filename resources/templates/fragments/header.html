@@ -1,5 +1,34 @@
-<div class="headerWrapper">
-  <div class="headerContainer">
-    <a href="https://www.kasi.re.kr/"><img src="{{ url_for('static', filename='images/Korea_Astronomy.svg') }}" alt="한국천문연구원 로고"></a>
+<header class="border-0 bg-white">
+  <div class="container-xxl py-3">
+    <div class="d-flex align-items-center gap-3">
+      <!-- 좌: 로고 -->
+      <a href="/" class="d-inline-flex align-items-center text-decoration-none">
+        <img src="{{ url_for('static', filename='images/Korea_Astronomy.svg') }}"
+             alt="KASI" height="60" class="me-2">
+        <span class="visually-hidden">한국천문연구원</span>
+      </a>
+
+      <!-- 우: 액션들(오른쪽 끝으로 밀기) -->
+      <div class="header-actions d-flex align-items-center gap-2 flex-wrap ms-auto">
+        <!-- 파일 업로드 -->
+        <label class="btn btn-primary px-3 mb-0">
+          <input id="fileInput" type="file" accept=".fits,.fit" hidden>
+          File Upload
+        </label>
+
+        <!-- 보정(클리핑) -->
+        <div class="btn-group" role="group" aria-label="clipping">
+          <button id="btnClipOn"  type="button" class="btn btn-outline-secondary">보정 ON</button>
+          <button id="btnClipOff" type="button" class="btn btn-outline-secondary active">보정 OFF</button>
+        </div>
+
+        <!-- 슬라이스(Z) -->
+        <div class="input-group" style="width: 220px;">
+          <span class="input-group-text">슬라이스</span>
+          <input id="sliceIndex" type="number" class="form-control" min="0" value="0" disabled>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
+  <hr class="m-0">
+</header>
