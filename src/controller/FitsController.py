@@ -53,7 +53,7 @@ def upload():
         f.save(path)
 
         file_id, shape, header = fits_service.register_fits(path)
-        png, w, h = fits_service.load_preview(file_id)
+        png, w, h = fits_service.load_preview(file_id, percent_clip=1.0, apply_correction=False)
 
         return jsonify({
             "file_id": file_id,
