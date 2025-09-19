@@ -11,6 +11,10 @@
   const headerMetaEl = $("fitsMeta");
   const pixelEl = $("px") && $("py") ? { x: $("px"), y: $("py") } : null;
 
+  // ✅ 보정과 무관하게 항상 동일한 스트레칭을 쓰도록 고정
+  //    (원하면 UI로 따로 빼서 제어 가능)
+  const PERCENT_CLIP = "1.0";
+
   // 전역 상태
   window.G = window.G || {
     fileId: null,
@@ -23,21 +27,24 @@
   // 현재 프리뷰 드로잉 상태(좌표 변환용)
   const fitDraw = { drawX: 0, drawY: 0, drawW: 0, drawH: 0, natW: 0, natH: 0 };
 
-  // 부모 크기에 맞게 캔버스 픽셀 크기 설정
+  // 부모 크기에 맞게 캔버스 픽셀 크기 설정 (DPR 안전)
   function sizeToParent(canvas) {
     const rect = canvas.getBoundingClientRect();
-    // DPR 고려
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    // CSS 크기 명시
+    canvas.style.width  = rect.width  + "px";
+    canvas.style.height = rect.height + "px";
+    // 실제 캔버스 버퍼 크기
+    canvas.width  = Math.max(1, Math.round(rect.width  * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // CSS 픽셀 좌표계로 맞춤
+    // 이후 좌표는 CSS px 기준
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   [fitsCanvas, slitCanvas, spectrumCanvas].forEach(sizeToParent);
   window.addEventListener("resize", () => {
     [fitsCanvas, slitCanvas, spectrumCanvas].forEach(sizeToParent);
-    // 리사이즈 시 프리뷰/슬릿 재도장 (이미지 캐시가 있다면 재사용)
     if (G._lastPreview) drawFitsPreview(G._lastPreview);
     if (G._lastSlit) drawImageToCanvas(G._lastSlit, slitCanvas);
     if (G._lastSpec) renderSpectrum(G._lastSpec.wavelength, G._lastSpec.intensity);
@@ -59,12 +66,14 @@
 
   window.refreshPreview = async function refreshPreview() {
     if (!G.fileId) return;
-    const clip = !!window.HeaderControls?.clipOn;
+    // ✅ 보정 여부만 토글 / 스트레칭은 고정
+    const correctionOn = !!window.HeaderControls?.clipOn;
+
     const params = new URLSearchParams({
       file_id: G.fileId,
       z: String(G.currentZ),
-      percent_clip: clip ? "1.0" : "0.0",
-      apply_correction: clip ? "true" : "false",
+      percent_clip: PERCENT_CLIP,
+      apply_correction: correctionOn ? "true" : "false",
     });
     const out = await fetchJSON(`${API_BASE}/preview?${params.toString()}`);
     window.setFitsPreview(out.preview_png);
@@ -75,18 +84,18 @@
   };
 
   window.drawSlitAndSpectrum = async function drawSlitAndSpectrum(x, y) {
-    const clip = !!window.HeaderControls?.clipOn;
+    const correctionOn = !!window.HeaderControls?.clipOn;
 
     // 슬릿
     let out = await fetchJSON(
-      `${API_BASE}/slit?file_id=${G.fileId}&x=${x}&percent_clip=${clip ? "1.0" : "0.0"}&apply_correction=${clip ? "true" : "false"}`
+      `${API_BASE}/slit?file_id=${G.fileId}&x=${x}&percent_clip=${PERCENT_CLIP}&apply_correction=${correctionOn ? "true" : "false"}`
     );
     G._lastSlit = out.slit_png;
     drawImageToCanvas(out.slit_png, slitCanvas);
 
     // 스펙트럼
     out = await fetchJSON(
-      `${API_BASE}/spectrum?file_id=${G.fileId}&x=${x}&y=${y}&apply_correction=${clip ? "true" : "false"}`
+      `${API_BASE}/spectrum?file_id=${G.fileId}&x=${x}&y=${y}&apply_correction=${correctionOn ? "true" : "false"}`
     );
     G._lastSpec = { wavelength: out.wavelength, intensity: out.intensity };
     renderSpectrum(out.wavelength, out.intensity);
@@ -95,42 +104,38 @@
   // ========= 그리기 유틸 =========
   function drawFitsPreview(dataUrl) {
     const ctx = fitsCanvas.getContext("2d");
-    ctx.clearRect(0, 0, fitsCanvas.width, fitsCanvas.height);
+    const { width: contW, height: contH } = fitsCanvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, contW, contH);
 
     const img = new Image();
     img.onload = () => {
-      // object-fit: contain
-      const contW = fitsCanvas.width;
-      const contH = fitsCanvas.height;
+      const { width: contW2, height: contH2 } = fitsCanvas.getBoundingClientRect();
       const natW = img.naturalWidth || img.width;
       const natH = img.naturalHeight || img.height;
       const imgAR = natW / natH;
-      const contAR = contW / contH;
+      const contAR = contW2 / contH2;
 
       let drawW, drawH, drawX, drawY;
       if (contAR > imgAR) {
-        drawH = contH;
+        drawH = contH2;
         drawW = Math.floor(drawH * imgAR);
-        drawX = Math.floor((contW - drawW) / 2);
+        drawX = Math.floor((contW2 - drawW) / 2);
         drawY = 0;
       } else {
-        drawW = contW;
+        drawW = contW2;
         drawH = Math.floor(drawW / imgAR);
         drawX = 0;
-        drawY = Math.floor((contH - drawH) / 2);
+        drawY = Math.floor((contH2 - drawH) / 2);
       }
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
-      // 저장(좌표 변환에 필요)
       Object.assign(fitDraw, { drawX, drawY, drawW, drawH, natW, natH });
 
-      // 클릭 이벤트 1회만 바인딩
       if (!fitsCanvas._clickBound) {
         fitsCanvas.addEventListener("click", onFitsClick);
         fitsCanvas._clickBound = true;
       }
 
-      // 마지막 클릭 마커 다시 그리기
       if (Number.isInteger(G.lastX) && Number.isInteger(G.lastY)) {
         drawMarkerAtDataXY(G.lastX, G.lastY);
       }
@@ -140,22 +145,22 @@
 
   function drawImageToCanvas(dataUrl, canvas) {
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const { width: contW, height: contH } = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, contW, contH);
     const img = new Image();
     img.onload = () => {
-      const contW = canvas.width, contH = canvas.height;
+      const { width: cw, height: ch } = canvas.getBoundingClientRect();
       const natW = img.naturalWidth || img.width;
       const natH = img.naturalHeight || img.height;
-      const imgAR = natW / natH, contAR = contW / contH;
+      const imgAR = natW / natH, contAR = cw / ch;
       let w, h, x, y;
-      if (contAR > imgAR) { h = contH; w = Math.floor(h * imgAR); x = Math.floor((contW - w)/2); y = 0; }
-      else { w = contW; h = Math.floor(w / imgAR); x = 0; y = Math.floor((contH - h)/2); }
+      if (contAR > imgAR) { h = ch; w = Math.floor(h * imgAR); x = Math.floor((cw - w)/2); y = 0; }
+      else { w = cw; h = Math.floor(w / imgAR); x = 0; y = Math.floor((ch - h)/2); }
       ctx.drawImage(img, x, y, w, h);
     };
     img.src = dataUrl;
   }
 
-  // 데이터 좌표(x,y)를 현재 도장 상태에 맞게 표시
   function drawMarkerAtDataXY(x, y) {
     if (!fitDraw.drawW || !fitDraw.drawH) return;
     const u = x / fitDraw.natW;
@@ -164,7 +169,6 @@
     const cy = fitDraw.drawY + v * fitDraw.drawH;
 
     const ctx = fitsCanvas.getContext("2d");
-    // 마커는 프리뷰 위에 다시 그림 (간단한 십자 표시)
     ctx.save();
     ctx.strokeStyle = "rgba(255,0,0,0.9)";
     ctx.lineWidth = 1;
@@ -176,11 +180,9 @@
     ctx.restore();
   }
 
-  // 캔버스 클릭 -> (x,y) 산출
   function onFitsClick(e) {
     if (!G.fileId) return;
     const rect = fitsCanvas.getBoundingClientRect();
-    // CSS px -> 캔버스 좌표 (DPR 고려 setTransform 덕에 1:1)
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
 
@@ -194,21 +196,16 @@
     const y = Math.round(v * natH);
     G.lastX = x; G.lastY = y;
 
-    // 메타 텍스트 갱신(있는 경우)
     if (pixelEl) { pixelEl.x.textContent = String(x); pixelEl.y.textContent = String(y); }
 
-    // 이미지 다시 그리고 마커 표시
     if (G._lastPreview) drawFitsPreview(G._lastPreview);
     drawMarkerAtDataXY(x, y);
 
-    // 슬릿/스펙트럼
     window.drawSlitAndSpectrum(x, y);
   }
 
-  // 스펙트럼 그리기
   function renderSpectrum(wavelength, intensity) {
     const ctx = spectrumCanvas.getContext("2d");
-    // Chart.js는 자체 캔버스 상태 사용—크기만 유지
     if (G.spectrumChart) { G.spectrumChart.destroy(); G.spectrumChart = null; }
     G.spectrumChart = new Chart(ctx, {
       type: "line",
@@ -224,8 +221,5 @@
     });
   }
 
-  // 전역 노출 (헤더에서 호출)
   window.renderSpectrum = renderSpectrum;
-
-  // 초기 사이즈 세팅(이미 함) + 초기화 끝
 })();

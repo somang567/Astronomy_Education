@@ -139,7 +139,7 @@
       // 업로드 전에는 슬라이스 비활성화
       if (els.sliceIndex) els.sliceIndex.disabled = true;
       setStatus("준비 완료", "success");
-    });
+    }); 
   
     // 외부에서 참조 가능하도록 노출
     Object.defineProperty(global, "HeaderControls", {

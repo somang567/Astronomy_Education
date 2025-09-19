@@ -87,8 +87,7 @@
 {% endblock %}
 
 {% block scripts %}
-  <!-- 순서 중요: Chart.js → 뷰어 → 헤더 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  {{ super() }}
   <script src="{{ url_for('static', filename='js/mainViewer.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/header.js') }}" defer></script>
 {% endblock %}
