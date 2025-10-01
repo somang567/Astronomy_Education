@@ -26,7 +26,7 @@ def register_fits(path: str) -> tuple[str, tuple[int, ...] | None, dict[str, Any
     file_id = str(uuid.uuid4())
     _FILE_REG[file_id] = {
         "path": path,
-        "shape": shape,
+        "shape": shape,                                             
         "header": header,
         "cube": np.asarray(arr, dtype=np.float32) if arr is not None else None,
     }

@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+    {
+        "name": "Local MariaDB (Docker)",
+        "driver": "MySQL",
+        "server": "127.0.0.1",
+        "port": 3310,
+        "database": "astro",
+        "username": "root",
+        "askForPassword": true   // ← 비밀번호는 실행 시 입력(보안상 안전)
+        // "password": "1234"    // ← 팀 저장소에 커밋되면 위험
+    }
+  ]
+}           
