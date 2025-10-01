@@ -1,0 +1,24 @@
+:root { --chip-radius: 9999px; }
+body.search-page { background: #0b0f17; color: #e7e8ea; }
+
+.search-wrap { background: #0e1523; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: .75rem; }
+.search-input { background: transparent; border: none; color: #e7e8ea; }
+.search-input:focus { outline: none; box-shadow: none; }
+
+.chip { border-radius: var(--chip-radius); border: 1px solid rgba(255,255,255,.12); padding: .25rem .6rem; display: inline-flex; align-items: center; gap: .35rem; font-size: .875rem; background: rgba(255,255,255,.05); }
+.chip .btn-close { filter: invert(1) grayscale(1); opacity: .6; }
+
+.filter-bar { border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #0e1523; }
+.filter-title { font-size: .85rem; color: #9aa4b2; }
+.filter-pill { border-radius: var(--chip-radius); padding: .5rem .75rem; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); cursor: pointer; user-select: none; }
+.filter-pill.active { border-color: rgba(0,190,255,.6); background: rgba(0,190,255,.1); }
+
+.result-card { background: #0f1726; border: 1px solid rgba(255,255,255,.08); }
+.thumb { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: .5rem; background: #0a1120; }
+.meta dd { color: #cfd6df; }
+
+.form-control, .form-select { background: #0b1220; color: #e7e8ea; border: 1px solid rgba(255,255,255,.12); }
+.form-control::placeholder { color: #8a95a5; }
+.dropdown-menu { background: #0e1523; border: 1px solid rgba(255,255,255,.1); }
+.dropdown-item { color: #e7e8ea; }
+.dropdown-item.active, .dropdown-item:active { background: rgba(0,190,255,.15); }

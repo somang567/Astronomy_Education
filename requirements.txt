@@ -1,8 +1,8 @@
 Flask
 Jinja2
-psycopg2-binary
 SQLAlchemy
 Flask-SQLAlchemy
+Flask-Migrate
 python-dotenv
 requests
 Flask-CORS
@@ -10,3 +10,4 @@ astropy
 numpy
 pillow
 matplotlib
+mariadb==1.1.10

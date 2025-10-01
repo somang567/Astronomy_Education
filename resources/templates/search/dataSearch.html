@@ -1,0 +1,146 @@
+{% extends "layouts/layout.html" %}
+
+{% block title %}데이터 검색 | Slit Viewer{% endblock %}
+{% block body_class %}search-page{% endblock %}
+
+{% block head_extra %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
+{% endblock %}
+
+{% block content %}
+  <main id="searchRoot" class="container py-4"
+        data-api="{{ url_for('search.api_search') }}"
+        data-slit="{{ url_for('fits.preview') }}"
+        data-spectrum="{{ url_for('fits.spectrum') }}"
+        data-placeholder="{{ url_for('static', filename='img/placeholder_fits.png') }}">
+
+    <!-- Search row -->
+    <div class="search-wrap mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <input id="q" class="form-control search-input"
+               placeholder="대상명, FITS 키워드, 주석 등 검색"
+               value="{{ request.args.get('q','') }}" />
+        <div class="vr text-white-50"></div>
+        <div class="d-flex align-items-center gap-2">
+          <input type="date" class="form-control form-control-sm" id="dateFrom"
+                 value="{{ request.args.get('date_from','') }}"/>
+          <span class="text-secondary small">~</span>
+          <input type="date" class="form-control form-control-sm" id="dateTo"
+                 value="{{ request.args.get('date_to','') }}"/>
+          <button class="btn btn-sm btn-outline-info" id="quickRange">최근 7일</button>
+        </div>
+        <button class="btn btn-sm btn-outline-light ms-auto" id="openFilters"
+                data-bs-toggle="collapse" data-bs-target="#advancedFilters"
+                aria-expanded="false" aria-controls="advancedFilters">고급 필터</button>
+        <button class="btn btn-sm btn-info" id="runSearch">검색</button>
+      </div>
+      <!-- Active chips -->
+      <div id="activeChips" class="mt-2 d-flex flex-wrap gap-2"></div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="collapse {{ 'show' if request.args.get('instrument') or request.args.get('flags') or request.args.get('exp_min') or request.args.get('exp_max') or request.args.get('frames_min') or request.args.get('frames_max') else '' }}"
+         id="advancedFilters">
+      <div class="filter-bar p-3 mb-3">
+        <div class="row g-3 align-items-center">
+          <div class="col-12 col-md-3">
+            <div class="filter-title mb-1">관측 장비</div>
+            <div class="d-flex flex-wrap gap-2" data-filter="instrument">
+              {% set selected_insts = (request.args.get('instrument','') or '').split(',') if request.args.get('instrument') else [] %}
+              {% for inst in instruments %}
+                <span class="filter-pill {% if inst in selected_insts %}active{% endif %}"
+                      data-value="{{ inst }}">{{ inst }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="filter-title mb-1">노출 시간 (sec)</div>
+            <div class="d-flex gap-2">
+              <input type="number" class="form-control form-control-sm" id="expMin" placeholder="min"
+                     value="{{ request.args.get('exp_min','') }}"/>
+              <input type="number" class="form-control form-control-sm" id="expMax" placeholder="max"
+                     value="{{ request.args.get('exp_max','') }}"/>
+            </div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="filter-title mb-1">프레임/슬라이스</div>
+            <div class="d-flex gap-2">
+              <input type="number" class="form-control form-control-sm" id="framesMin" placeholder="min"
+                     value="{{ request.args.get('frames_min','') }}"/>
+              <input type="number" class="form-control form-control-sm" id="framesMax" placeholder="max"
+                     value="{{ request.args.get('frames_max','') }}"/>
+            </div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="filter-title mb-1">플래그</div>
+            {% set selected_flags = (request.args.get('flags','') or '').split(',') if request.args.get('flags') else [] %}
+            <div class="d-flex flex-wrap gap-2" data-filter="flags">
+              {% for f in ['has_slit','has_spectrum','corrected','clipped'] %}
+                <span class="filter-pill {% if f in selected_flags %}active{% endif %}"
+                      data-value="{{ f }}">{{ {'has_slit':'슬릿 이미지 있음','has_spectrum':'스펙트럼 생성됨','corrected':'보정 적용','clipped':'클리핑'}[f] }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results / summary bar -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="small text-secondary" id="summary">검색 전입니다.</div>
+      <div class="d-flex align-items-center gap-2">
+        {% set sort = request.args.get('sort','-observed_at') %}
+        <select id="sortBy" class="form-select form-select-sm" style="width:auto">
+          <option value="-observed_at" {{ 'selected' if sort=='-observed_at' else '' }}>DATE-OBS 최신순</option>
+          <option value="observed_at"  {{ 'selected' if sort=='observed_at'  else '' }}>DATE-OBS 오래된순</option>
+          <option value="object"       {{ 'selected' if sort=='object'       else '' }}>대상명 A→Z</option>
+          <option value="-exptime"     {{ 'selected' if sort=='-exptime'     else '' }}>노출시간 ↓</option>
+          <option value="exptime"      {{ 'selected' if sort=='exptime'      else '' }}>노출시간 ↑</option>
+        </select>
+        <div class="btn-group" role="group" aria-label="뷰 스위치">
+          <input type="radio" class="btn-check" name="viewmode" id="vmGrid" autocomplete="off" checked>
+          <label class="btn btn-outline-light btn-sm" for="vmGrid">그리드</label>
+          <input type="radio" class="btn-check" name="viewmode" id="vmList" autocomplete="off">
+          <label class="btn btn-outline-light btn-sm" for="vmList">리스트</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result grid -->
+    <div id="results" class="row g-3"><!-- JS 렌더링 --></div>
+
+    <!-- Card template -->
+    <template id="tplResultCard">
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card result-card p-3 h-100">
+          <img class="thumb mb-3" alt="preview" />
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <h6 class="mb-1 target-name"></h6>
+              <div class="small text-secondary filename"></div>
+            </div>
+            <span class="badge bg-info-subtle text-info-emphasis fw-normal date-obs"></span>
+          </div>
+          <dl class="row small mt-3 meta">
+            <dt class="col-5">노출</dt><dd class="col-7 exptime"></dd>
+            <dt class="col-5">프레임</dt><dd class="col-7 frames"></dd>
+            <dt class="col-5">사이즈</dt><dd class="col-7 shape"></dd>
+            <dt class="col-5">플래그</dt><dd class="col-7 flags"></dd>
+          </dl>
+          <div class="d-flex gap-2 mt-auto">
+            <a class="btn btn-sm btn-outline-info w-100" href="#" data-action="open-slit">슬릿 보기</a>
+            <a class="btn btn-sm btn-outline-light w-100" href="#" data-action="open-spectrum">스펙트럼</a>
+          </div>
+        </div>
+      </div>
+    </template>
+  </main>
+{% endblock %}
+
+{% block scripts_extra %}
+  <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}

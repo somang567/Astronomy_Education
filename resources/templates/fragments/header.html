@@ -8,27 +8,42 @@
         <span class="visually-hidden">한국천문연구원</span>
       </a>
 
+      {# 검색 페이지/또는 컨트롤 숨김 플래그면 업로드/보정/슬라이스 숨김 #}
+      {% set _hide_controls = (hide_viewer_controls|default(false)) or (request.endpoint == 'search.search') %}
+
       <!-- 우: 액션들(오른쪽 끝으로 밀기) -->
       <div class="header-actions d-flex align-items-center gap-2 flex-wrap ms-auto">
-        <!-- 파일 업로드 -->
-        <label class="btn btn-primary px-3 mb-0">
-          <input id="fileInput" type="file" accept=".fits,.fit,.fts,.fz,.gz,.fits.gz" hidden>
-          File Upload
-        </label>
 
-        <!-- 보정(클리핑) -->
-        <div class="btn-group" role="group" aria-label="clipping">
-          <button id="btnClipOn"  type="button" class="btn btn-outline-secondary">보정 ON</button>
-          <button id="btnClipOff" type="button" class="btn btn-outline-secondary active">보정 OFF</button>
-        </div>
+        <!-- ✅ 항상 보이는: 데이터 찾기 -->
+        <a href="{{ url_for('search.search') }}"
+           class="btn btn-outline-primary px-3 mb-0">데이터 찾기</a>
 
-        <!-- 슬라이스(Z) -->
-        <div class="input-group" style="width: 220px;">
-          <span class="input-group-text">슬라이스</span>
-          <input id="sliceIndex" type="number" class="form-control" min="0" value="0" disabled>
-        </div>
+        <!-- ✅ 항상 보이는: 데이터 찾기 -->
+        <a href="{{ url_for('main') }}"
+           class="btn btn-outline-primary px-3 mb-0">메인화면으로</a>
+
+        {% if not _hide_controls %}
+          <!-- 파일 업로드 -->
+          <label class="btn btn-primary px-3 mb-0">
+            <input id="fileInput" type="file" accept=".fits,.fit,.fts,.fz,.gz,.fits.gz" hidden>
+            File Upload
+          </label>
+
+          <!-- 보정(클리핑) -->
+          <div class="btn-group" role="group" aria-label="clipping">
+            <button id="btnClipOn"  type="button" class="btn btn-outline-secondary">보정 ON</button>
+            <button id="btnClipOff" type="button" class="btn btn-outline-secondary active">보정 OFF</button>
+          </div>
+
+          <!-- 슬라이스(Z) -->
+          <div class="input-group" style="width: 220px;">
+            <span class="input-group-text">슬라이스</span>
+            <input id="sliceIndex" type="number" class="form-control" min="0" value="0" disabled>
+          </div>
+        {% endif %}
+
       </div>
     </div>
   </div>
   <hr class="m-0">
-</header>
+</header>                           
