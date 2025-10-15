@@ -1,24 +1,118 @@
-:root { --chip-radius: 9999px; }
-body.search-page { background: #0b0f17; color: #e7e8ea; }
+/* Behance Day 567 느낌: 유리감 + 부드러운 인터랙션 */
+:root{
+    --glass-bg: rgba(255,255,255,.06);
+    --glass-bd: rgba(255,255,255,.15);
+    --pill-on: rgba(56,189,248,.18);
+    --pill-on-bd: rgba(56,189,248,.5);
+  }
+  
+  body.search-page{
+    background: radial-gradient(1200px 800px at 20% -10%, rgba(56,189,248,.15), transparent 50%),
+                radial-gradient(1200px 800px at 90% 10%, rgba(168,85,247,.12), transparent 50%),
+                #0b0f14;
+  }
+  
+  .glass.card{
+    border: 1px solid var(--glass-bd);
+    background: linear-gradient(180deg, var(--glass-bg), rgba(255,255,255,.02));
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    border-radius: 16px;
+  }
+  
+  .dt-input{
+    min-width: 260px;
+  }
+  
+  .btn-chip{
+    border-radius: 999px;
+    background: var(--pill-on);
+    border: 1px solid var(--pill-on-bd);
+    color: #c3e8ff;
+    padding: .35rem .8rem;
+  }
+  .btn-outline-reset{
+    border-radius: 999px;
+    border: 1px dashed rgba(255,255,255,.4);
+    color: rgba(255,255,255,.8);
+    background: transparent;
+  }
+  
+  /* 필터 칩 */
+  .filter-pill{
+    display:inline-flex; align-items:center;
+    padding:.35rem .6rem;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.25);
+    color:#e8f3ff; cursor:pointer;
+    user-select:none; transition:.15s;
+  }
+  .filter-pill.active{
+    background: var(--pill-on);
+    border-color: var(--pill-on-bd);
+    color:#dff6ff;
+  }
+  .filter-title{ color:#9fb1c9; font-size:.9rem }
+  
+  /* 결과 카드 */
+  .result-card{
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.03);
+    border-radius: 16px;
+  }
+  .result-card .thumb{
+    width:100%; aspect-ratio: 16 / 9; object-fit: cover;
+    border-radius: 10px; border:1px solid rgba(255,255,255,.12);
+    background:#0e141a;
+  }
+  
+  /* 시간대 브러시(이중 핸들) */
+  .time-brush .brush-track{ position:relative; height: 44px; }
+  .time-brush input[type="range"]{
+    position:absolute; left:0; right:0; width:100%; pointer-events: none;
+    -webkit-appearance: none; background: none; height: 44px; margin:0;
+  }
+  .time-brush input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance: none; pointer-events: auto; width:16px; height:16px;
+    border-radius: 50%; background:#fff; border:2px solid #60a5fa;
+    box-shadow: 0 0 0 6px rgba(96,165,250,.2);
+  }
+  .time-brush .brush-fill{
+    position:absolute; height:4px; left:0; right:0; top:20px;
+    background: linear-gradient(90deg, #60a5fa, #22d3ee);
+    border-radius: 2px; opacity:.8;
+  }
+  .time-brush .brush-ticks{
+    position:absolute; top:28px; left:0; right:0;
+    display:flex; justify-content:space-between; color:#9fb1c9; font-size:.75rem;
+  }
+  
+  /* 검색 인풋 */
+  .search-input{
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.2);
+    color:#e6f2ff;
+  }
+  
+  /* 칩/빠른범위 버튼 선명하게 */
+.btn-chip, .filter-pill { opacity: 1 !important; color:#0a4b72 !important; background:#e6f4ff !important; border:1px solid #b3defc !important; }
+.btn-chip:hover, .filter-pill:hover { box-shadow:0 0 0 2px rgba(0,179,255,.25); }
 
-.search-wrap { background: #0e1523; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: .75rem; }
-.search-input { background: transparent; border: none; color: #e7e8ea; }
-.search-input:focus { outline: none; box-shadow: none; }
+/* 결과 테이블 */
+.results-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+.results-table th, .results-table td { padding:12px 14px; border-bottom:1px solid #f1f3f5; vertical-align:middle; font-size:14px; }
+.results-table th { background:#f8fafc; color:#334155; font-weight:600; }
+.results-table tbody tr:hover:not(.detail-row) { background:#f7fbff; cursor:pointer; }
+.results-table .thumb { width:96px; height:54px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; }
+.results-empty { color:#64748b; text-align:center; padding:48px 0; }
 
-.chip { border-radius: var(--chip-radius); border: 1px solid rgba(255,255,255,.12); padding: .25rem .6rem; display: inline-flex; align-items: center; gap: .35rem; font-size: .875rem; background: rgba(255,255,255,.05); }
-.chip .btn-close { filter: invert(1) grayscale(1); opacity: .6; }
-
-.filter-bar { border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #0e1523; }
-.filter-title { font-size: .85rem; color: #9aa4b2; }
-.filter-pill { border-radius: var(--chip-radius); padding: .5rem .75rem; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); cursor: pointer; user-select: none; }
-.filter-pill.active { border-color: rgba(0,190,255,.6); background: rgba(0,190,255,.1); }
-
-.result-card { background: #0f1726; border: 1px solid rgba(255,255,255,.08); }
-.thumb { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: .5rem; background: #0a1120; }
-.meta dd { color: #cfd6df; }
-
-.form-control, .form-select { background: #0b1220; color: #e7e8ea; border: 1px solid rgba(255,255,255,.12); }
-.form-control::placeholder { color: #8a95a5; }
-.dropdown-menu { background: #0e1523; border: 1px solid rgba(255,255,255,.1); }
-.dropdown-item { color: #e7e8ea; }
-.dropdown-item.active, .dropdown-item:active { background: rgba(0,190,255,.15); }
+/* 디테일 패널(토글로 나오는 행) */
+.detail-row td { padding:0; background:#fbfdff; }
+.detail-inner { padding:14px; border-top:1px solid #eaf4ff; }
+.detail-grid { display:grid; grid-template-columns: 300px 1fr; gap:14px; }
+.detail-preview { border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff; }
+.detail-preview img { width:100%; display:block; }
+.detail-meta { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px 18px; }
+.detail-meta dt { font-size:12px; color:#64748b; }
+.detail-meta dd { margin:0; font-size:14px; }
+.detail-actions { display:flex; gap:8px; margin-top:10px; }
