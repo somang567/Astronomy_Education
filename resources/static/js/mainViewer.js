@@ -7,12 +7,12 @@
   const slitCanvas = $("slitCanvas");
   const spectrumCanvas = $("spectrumCanvas");
 
-  const fileNameEl = $("fitsFileName");     // 상단 메타(옵션)
-  const headerMetaEl = $("fitsMeta");
-  const pixelEl = $("px") && $("py") ? { x: $("px"), y: $("py") } : null;
+  // ✅ 상단 메타 표시 엘리먼트
+  const fileNameEl   = $("fitsFileName"); // FileName: <span id="fitsFileName">
+  const headerMetaEl = $("fitsMeta");     // Meta Data: <span id="fitsMeta">
+  const pixelEl      = $("px") && $("py") ? { x: $("px"), y: $("py") } : null;
 
-  // ✅ 보정과 무관하게 항상 동일한 스트레칭을 쓰도록 고정
-  //    (원하면 UI로 따로 빼서 제어 가능)
+  // 보정과 무관하게 동일한 스트레칭 값 고정(시각화 안정)
   const PERCENT_CLIP = "1.0";
 
   // 전역 상태
@@ -27,21 +27,47 @@
   // 현재 프리뷰 드로잉 상태(좌표 변환용)
   const fitDraw = { drawX: 0, drawY: 0, drawW: 0, drawH: 0, natW: 0, natH: 0 };
 
-  // 부모 크기에 맞게 캔버스 픽셀 크기 설정 (DPR 안전)
+  // ---------- 유틸 ----------
   function sizeToParent(canvas) {
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    // CSS 크기 명시
     canvas.style.width  = rect.width  + "px";
     canvas.style.height = rect.height + "px";
-    // 실제 캔버스 버퍼 크기
     canvas.width  = Math.max(1, Math.round(rect.width  * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     const ctx = canvas.getContext("2d");
-    // 이후 좌표는 CSS px 기준
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  function fetchJSON(url) {
+    return fetch(url).then(async (r) => {
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+      return out;
+    });
+  }
+
+  const setText = (el, text) => { if (el) el.textContent = (text ?? "").toString(); };
+
+  function summarizeHeader(hdr) {
+    if (!hdr || typeof hdr !== "object") return "없음";
+    const pick = (k) => (hdr[k] ?? hdr[k?.toUpperCase()]);
+    const parts = [];
+    const obj = pick("OBJECT"); if (obj) parts.push(`OBJECT=${obj}`);
+    const dob = pick("DATE-OBS"); if (dob) parts.push(`DATE-OBS=${dob}`);
+    const exp = pick("EXPTIME") ?? pick("EXPOSURE"); if (exp) parts.push(`EXPTIME=${exp}`);
+    const nax1 = pick("NAXIS1"), nax2 = pick("NAXIS2"), nax3 = pick("NAXIS3");
+    if (nax1 && nax2) parts.push(`NAXIS=${nax3 ? `${nax3}×${nax2}×${nax1}` : `${nax2}×${nax1}`}`);
+    return parts.join(" | ") || "헤더 정보 없음";
+  }
+
+  function applyMeta(filename, headerObj) {
+    if (filename) setText(fileNameEl, filename);
+    if (headerObj) setText(headerMetaEl, summarizeHeader(headerObj));
+  }
+
+  // ---------- 초기 크기 세팅 & 리사이즈 ----------
   [fitsCanvas, slitCanvas, spectrumCanvas].forEach(sizeToParent);
   window.addEventListener("resize", () => {
     [fitsCanvas, slitCanvas, spectrumCanvas].forEach(sizeToParent);
@@ -50,23 +76,27 @@
     if (G._lastSpec) renderSpectrum(G._lastSpec.wavelength, G._lastSpec.intensity);
   });
 
-  // ========= 서버 통신 =========
-  async function fetchJSON(url) {
-    const r = await fetch(url);
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
-    return out;
-  }
+  // ---------- 전역 함수: 헤더/다른 스크립트에서 호출 ----------
+  // 업로드 성공 직후 헤더 스크립트에서 호출해주면 메타/프리뷰까지 반영됨
+  window.onFitsUploaded = function onFitsUploaded({ file_id, filename, header, preview_png, shape }) {
+    G.fileId = file_id;
+    G.currentZ = 0;
+    G.lastX = null;
+    G.lastY = null;
 
-  // 헤더에서 호출할 수 있도록 전역 공개
+    applyMeta(filename, header);       // ✅ 파일명/헤더 갱신
+    window.setFitsPreview(preview_png);
+  };
+
+  // 프리뷰 데이터 URL을 받아 캔버스에 그림
   window.setFitsPreview = function setFitsPreview(dataUrl) {
     G._lastPreview = dataUrl;
     drawFitsPreview(dataUrl);
   };
 
+  // 프리뷰 갱신(/fits/preview) → (가능하면) 파일명/헤더도 함께 갱신
   window.refreshPreview = async function refreshPreview() {
     if (!G.fileId) return;
-    // ✅ 보정 여부만 토글 / 스트레칭은 고정
     const correctionOn = !!window.HeaderControls?.clipOn;
 
     const params = new URLSearchParams({
@@ -75,14 +105,21 @@
       percent_clip: PERCENT_CLIP,
       apply_correction: correctionOn ? "true" : "false",
     });
+
     const out = await fetchJSON(`${API_BASE}/preview?${params.toString()}`);
     window.setFitsPreview(out.preview_png);
+
+    // ✅ 서버가 filename/header를 내려주면 메타 갱신
+    if (out.filename || out.header) {
+      applyMeta(out.filename, out.header);
+    }
 
     if (Number.isInteger(G.lastX) && Number.isInteger(G.lastY)) {
       await window.drawSlitAndSpectrum(G.lastX, G.lastY);
     }
   };
 
+  // 선택 좌표 기준 슬릿/스펙트럼 요청 후 렌더
   window.drawSlitAndSpectrum = async function drawSlitAndSpectrum(x, y) {
     const correctionOn = !!window.HeaderControls?.clipOn;
 
@@ -101,7 +138,7 @@
     renderSpectrum(out.wavelength, out.intensity);
   };
 
-  // ========= 그리기 유틸 =========
+  // ---------- 그리기 ----------
   function drawFitsPreview(dataUrl) {
     const ctx = fitsCanvas.getContext("2d");
     const { width: contW, height: contH } = fitsCanvas.getBoundingClientRect();
@@ -144,6 +181,7 @@
   }
 
   function drawImageToCanvas(dataUrl, canvas) {
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const { width: contW, height: contH } = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, contW, contH);

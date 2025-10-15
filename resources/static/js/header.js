@@ -53,6 +53,7 @@
   
     // 파일 선택 → 업로드
     async function onFileChosen(e) {
+      
       const file = e.target.files?.[0];
       if (!file) return;
   
@@ -70,6 +71,16 @@
         global.G.currentZ = 0;
         global.G.lastX = null;
         global.G.lastY = null;
+
+        // 업로드 성공 직후
+        window.onFitsUploaded && window.onFitsUploaded({
+          file_id: out.file_id,
+          filename: out.filename,
+          header: out.header,
+          preview_png: out.preview_png,
+          shape: out.shape
+        });
+
   
         // 메타 표시(있으면)
         els.fileNameEl && (els.fileNameEl.textContent = out.filename);

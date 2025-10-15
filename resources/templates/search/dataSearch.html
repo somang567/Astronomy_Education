@@ -1,146 +1,183 @@
 {% extends "layouts/layout.html" %}
-
 {% block title %}데이터 검색 | Slit Viewer{% endblock %}
-{% block body_class %}search-page{% endblock %}
 
-{% block head_extra %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
 {% endblock %}
 
 {% block content %}
-  <main id="searchRoot" class="container py-4"
-        data-api="{{ url_for('search.api_search') }}"
-        data-slit="{{ url_for('fits.preview') }}"
-        data-spectrum="{{ url_for('fits.spectrum') }}"
-        data-placeholder="{{ url_for('static', filename='img/placeholder_fits.png') }}">
 
-    <!-- Search row -->
-    <div class="search-wrap mb-3">
-      <div class="d-flex align-items-center gap-2">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
-        <input id="q" class="form-control search-input"
-               placeholder="대상명, FITS 키워드, 주석 등 검색"
-               value="{{ request.args.get('q','') }}" />
-        <div class="vr text-white-50"></div>
+<!-- 타임라인 모달 -->
+<div class="modal fade" id="frameViewer" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h6 class="modal-title">Time Sequence</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <input type="range" class="form-range" id="frameSlider" min="0" value="0" style="flex:1">
+          <div class="small text-secondary">
+            <span id="framePos">0</span>/<span id="frameTotal">0</span>
+            <span class="ms-2 badge bg-info-subtle text-info-emphasis" id="frameChannel">-</span>
+          </div>
+        </div>
+        <div class="text-center">
+          <img id="frameImage" class="img-fluid rounded border border-secondary" alt="frame">
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-light btn-sm" id="btnPlay">▶︎ 재생</button>
+          <button class="btn btn-outline-light btn-sm" id="btnPause">❚❚ 일시정지</button>
+        </div>
         <div class="d-flex align-items-center gap-2">
-          <input type="date" class="form-control form-control-sm" id="dateFrom"
-                 value="{{ request.args.get('date_from','') }}"/>
-          <span class="text-secondary small">~</span>
-          <input type="date" class="form-control form-control-sm" id="dateTo"
-                 value="{{ request.args.get('date_to','') }}"/>
-          <button class="btn btn-sm btn-outline-info" id="quickRange">최근 7일</button>
-        </div>
-        <button class="btn btn-sm btn-outline-light ms-auto" id="openFilters"
-                data-bs-toggle="collapse" data-bs-target="#advancedFilters"
-                aria-expanded="false" aria-controls="advancedFilters">고급 필터</button>
-        <button class="btn btn-sm btn-info" id="runSearch">검색</button>
-      </div>
-      <!-- Active chips -->
-      <div id="activeChips" class="mt-2 d-flex flex-wrap gap-2"></div>
-    </div>
-
-    <!-- Filter bar -->
-    <div class="collapse {{ 'show' if request.args.get('instrument') or request.args.get('flags') or request.args.get('exp_min') or request.args.get('exp_max') or request.args.get('frames_min') or request.args.get('frames_max') else '' }}"
-         id="advancedFilters">
-      <div class="filter-bar p-3 mb-3">
-        <div class="row g-3 align-items-center">
-          <div class="col-12 col-md-3">
-            <div class="filter-title mb-1">관측 장비</div>
-            <div class="d-flex flex-wrap gap-2" data-filter="instrument">
-              {% set selected_insts = (request.args.get('instrument','') or '').split(',') if request.args.get('instrument') else [] %}
-              {% for inst in instruments %}
-                <span class="filter-pill {% if inst in selected_insts %}active{% endif %}"
-                      data-value="{{ inst }}">{{ inst }}</span>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="filter-title mb-1">노출 시간 (sec)</div>
-            <div class="d-flex gap-2">
-              <input type="number" class="form-control form-control-sm" id="expMin" placeholder="min"
-                     value="{{ request.args.get('exp_min','') }}"/>
-              <input type="number" class="form-control form-control-sm" id="expMax" placeholder="max"
-                     value="{{ request.args.get('exp_max','') }}"/>
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="filter-title mb-1">프레임/슬라이스</div>
-            <div class="d-flex gap-2">
-              <input type="number" class="form-control form-control-sm" id="framesMin" placeholder="min"
-                     value="{{ request.args.get('frames_min','') }}"/>
-              <input type="number" class="form-control form-control-sm" id="framesMax" placeholder="max"
-                     value="{{ request.args.get('frames_max','') }}"/>
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="filter-title mb-1">플래그</div>
-            {% set selected_flags = (request.args.get('flags','') or '').split(',') if request.args.get('flags') else [] %}
-            <div class="d-flex flex-wrap gap-2" data-filter="flags">
-              {% for f in ['has_slit','has_spectrum','corrected','clipped'] %}
-                <span class="filter-pill {% if f in selected_flags %}active{% endif %}"
-                      data-value="{{ f }}">{{ {'has_slit':'슬릿 이미지 있음','has_spectrum':'스펙트럼 생성됨','corrected':'보정 적용','clipped':'클리핑'}[f] }}</span>
-              {% endfor %}
-            </div>
-          </div>
+          <label class="small text-secondary">속도</label>
+          <select id="playFps" class="form-select form-select-sm" style="width:auto">
+            <option value="3">3 fps</option>
+            <option value="6" selected>6 fps</option>
+            <option value="12">12 fps</option>
+          </select>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Results / summary bar -->
-    <div class="d-flex align-items-center justify-content-between mb-2">
-      <div class="small text-secondary" id="summary">검색 전입니다.</div>
-      <div class="d-flex align-items-center gap-2">
-        {% set sort = request.args.get('sort','-observed_at') %}
-        <select id="sortBy" class="form-select form-select-sm" style="width:auto">
-          <option value="-observed_at" {{ 'selected' if sort=='-observed_at' else '' }}>DATE-OBS 최신순</option>
-          <option value="observed_at"  {{ 'selected' if sort=='observed_at'  else '' }}>DATE-OBS 오래된순</option>
-          <option value="object"       {{ 'selected' if sort=='object'       else '' }}>대상명 A→Z</option>
-          <option value="-exptime"     {{ 'selected' if sort=='-exptime'     else '' }}>노출시간 ↓</option>
-          <option value="exptime"      {{ 'selected' if sort=='exptime'      else '' }}>노출시간 ↑</option>
+<main id="searchRoot" class="container-xxl py-4"
+      data-api="{{ url_for('mock.search') }}"
+      data-frames="{{ url_for('mock.frames', file_id='__FID__')|replace('__FID__','__FID__') }}"
+      data-fits="{{ url_for('mock.fits_file', file_id='__FID__')|replace('__FID__','__FID__') }}"
+      data-placeholder="{{ url_for('static', filename='img/placeholder_fits.png') }}">
+
+  <!-- 상단: 세분화 수동 입력 + 퀵버튼 -->
+  <section class="card p-3 p-md-4 mb-3">
+    <!-- 퀵버튼 -->
+    <div class="col-12 col-md d-flex flex-wrap gap-2 align-items-center mt-2 mt-md-0 mb-2">
+      <button class="btn btn-sm btn-outline-primary" data-quick="6h">최근 6시간</button>
+      <button class="btn btn-sm btn-outline-primary" data-quick="12h">최근 12시간</button>
+      <button class="btn btn-sm btn-outline-primary" data-quick="24h">최근 24시간</button>
+      <button class="btn btn-sm btn-outline-primary" data-quick="today">오늘</button>
+      <button class="btn btn-sm btn-outline-primary" data-quick="yesterday">어제</button>
+      <button class="btn btn-sm btn-outline-secondary" id="resetRange">초기화</button>
+    </div>
+
+    <!-- FROM 수동 -->
+    <div class="row g-2">
+      <div class="col-12"><div class="small text-secondary fw-semibold">시작(수동)</div></div>
+      <div class="col-6 col-md-2"><input id="yFrom"  type="number" class="form-control" placeholder="년(YYYY)" min="1900" max="2100"></div>
+      <div class="col-6 col-md-1"><input id="mFrom"  type="number" class="form-control" placeholder="월(1-12)" min="1" max="12"></div>
+      <div class="col-6 col-md-1"><input id="dFrom"  type="number" class="form-control" placeholder="일(1-31)" min="1" max="31"></div>
+      <div class="col-6 col-md-1">
+        <select id="apFrom" class="form-select">
+          <option value="">AM/PM</option>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
         </select>
-        <div class="btn-group" role="group" aria-label="뷰 스위치">
-          <input type="radio" class="btn-check" name="viewmode" id="vmGrid" autocomplete="off" checked>
-          <label class="btn btn-outline-light btn-sm" for="vmGrid">그리드</label>
-          <input type="radio" class="btn-check" name="viewmode" id="vmList" autocomplete="off">
-          <label class="btn btn-outline-light btn-sm" for="vmList">리스트</label>
+      </div>
+      <div class="col-6 col-md-1"><input id="hhFrom" type="number" class="form-control" placeholder="시(1-12)" min="1" max="12"></div>
+      <div class="col-6 col-md-1"><input id="mmFrom" type="number" class="form-control" placeholder="분(0-59)" min="0" max="59"></div>
+    </div>
+
+    <!-- TO 수동 -->
+    <div class="row g-2 mt-2">
+      <div class="col-12"><div class="small text-secondary fw-semibold">종료(수동)</div></div>
+      <div class="col-6 col-md-2"><input id="yTo"  type="number" class="form-control" placeholder="년(YYYY)" min="1900" max="2100"></div>
+      <div class="col-6 col-md-1"><input id="mTo"  type="number" class="form-control" placeholder="월(1-12)" min="1" max="12"></div>
+      <div class="col-6 col-md-1"><input id="dTo"  type="number" class="form-control" placeholder="일(1-31)" min="1" max="31"></div>
+      <div class="col-6 col-md-1">
+        <select id="apTo" class="form-select">
+          <option value="">AM/PM</option>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1"><input id="hhTo" type="number" class="form-control" placeholder="시(1-12)" min="1" max="12"></div>
+      <div class="col-6 col-md-1"><input id="mmTo" type="number" class="form-control" placeholder="분(0-59)" min="0" max="59"></div>
+    </div>
+
+    <!-- 키워드 + 고급필터 + 타임라인 전용 버튼 -->
+    <form id="searchForm" class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+      <input id="q" class="form-control" placeholder="대상명(OBJECT), 파일명 등"/>
+      <button class="btn btn-primary" id="runSearch" type="submit">검색</button>
+      <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advancedFilters" type="submit">
+        고급 필터
+      </button>
+      <!-- 필요 시 상단에서도 타임라인 진입 버튼을 둘 수 있음(선택) -->
+      <!-- <button class="btn btn-outline-primary" id="openTimelineTop" disabled>타임라인</button> -->
+    </form>
+
+    <div class="collapse mt-3" id="advancedFilters">
+      <div class="row g-3">
+        <div class="col-12 col-lg-3">
+          <div class="small text-secondary mb-1">관측 장비</div>
+          <div id="instPills" class="d-flex flex-wrap gap-2">
+            {% for inst in instruments %}
+              <span class="filter-pill" data-value="{{ inst }}">{{ inst }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="small text-secondary mb-1">노출시간 (sec)</div>
+          <div class="d-flex gap-2">
+            <input type="number" class="form-control form-control-sm" id="expMin" placeholder="min"/>
+            <input type="number" class="form-control form-control-sm" id="expMax" placeholder="max"/>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="small text-secondary mb-1">프레임</div>
+          <div class="d-flex gap-2">
+            <input type="number" class="form-control form-control-sm" id="framesMin" placeholder="min"/>
+            <input type="number" class="form-control form-control-sm" id="framesMax" placeholder="max"/>
+          </div>
+        </div>
+        <div class="col-12 col-lg-3">
+          <div class="small text-secondary mb-1">플래그</div>
+          <div id="flagPills" class="d-flex flex-wrap gap-2">
+            {% for f,label in {'has_slit':'슬릿 있음','has_spectrum':'스펙트럼 생성','corrected':'보정','clipped':'클리핑'}.items() %}
+              <span class="filter-pill" data-value="{{ f }}">{{ label }}</span>
+            {% endfor %}
+          </div>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- Result grid -->
-    <div id="results" class="row g-3"><!-- JS 렌더링 --></div>
+  <!-- 요약/정렬 -->
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="small text-secondary" id="summary">검색 전입니다.</div>
+    <select id="sortBy" class="form-select form-select-sm" style="width:auto">
+      <option value="-observed_at">DATE-OBS 최신순</option>
+      <option value="observed_at">DATE-OBS 오래된순</option>
+      <option value="object">대상명 A→Z</option>
+      <option value="-exptime">노출시간 ↓</option>
+      <option value="exptime">노출시간 ↑</option>
+    </select>
+  </div>
 
-    <!-- Card template -->
-    <template id="tplResultCard">
-      <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card result-card p-3 h-100">
-          <img class="thumb mb-3" alt="preview" />
-          <div class="d-flex align-items-start justify-content-between">
-            <div>
-              <h6 class="mb-1 target-name"></h6>
-              <div class="small text-secondary filename"></div>
-            </div>
-            <span class="badge bg-info-subtle text-info-emphasis fw-normal date-obs"></span>
-          </div>
-          <dl class="row small mt-3 meta">
-            <dt class="col-5">노출</dt><dd class="col-7 exptime"></dd>
-            <dt class="col-5">프레임</dt><dd class="col-7 frames"></dd>
-            <dt class="col-5">사이즈</dt><dd class="col-7 shape"></dd>
-            <dt class="col-5">플래그</dt><dd class="col-7 flags"></dd>
-          </dl>
-          <div class="d-flex gap-2 mt-auto">
-            <a class="btn btn-sm btn-outline-info w-100" href="#" data-action="open-slit">슬릿 보기</a>
-            <a class="btn btn-sm btn-outline-light w-100" href="#" data-action="open-spectrum">스펙트럼</a>
-          </div>
-        </div>
-      </div>
-    </template>
-  </main>
+  <!-- 결과표 + 아코디언 디테일 -->
+  <div id="results">
+    <table class="results-table d-none" id="resultsTable" aria-label="검색 결과">
+      <thead>
+      <tr>
+        <th style="width:110px">미리보기</th>
+        <th>대상 / 파일명</th>
+        <th style="width:180px">관측시각</th>
+        <th style="width:110px">노출(s)</th>
+        <th style="width:110px">프레임</th>
+        <th style="width:140px">장비</th>
+        <th style="width:170px">작업</th>
+      </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <div class="results-empty" id="resultsEmpty">검색 결과가 없습니다.</div>
+  </div>
+</main>
+
 {% endblock %}
 
-{% block scripts_extra %}
-  <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% block script %}
+<script defer src="{{ url_for('static', filename='js/search.js') }}?v=timeline_only"></script>
 {% endblock %}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
+from .mock.local_mock import mock_bp
 
 # 1) .env 먼저 로드
 ENV_FILE = find_dotenv(filename=".env", usecwd=True) or str(Path(__file__).resolve().parents[1] / ".env")
@@ -52,5 +53,5 @@ def create_app():
     # 블루프린트 등록
     app.register_blueprint(fits_bp, url_prefix="/fits")
     app.register_blueprint(search_bp)  # /search, /api/search
-
+    app.register_blueprint(mock_bp) # local_fits 파일과 테스트 하기 위함으로 만듦.
     return app
