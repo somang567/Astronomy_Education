@@ -1,13 +1,13 @@
-# src/controller/fitsController.py (또는 fits blueprint 파일)
+# src/controller/fitsController.py
 from __future__ import annotations
-import os, base64, uuid, traceback
-from uuid import UUID  # ✅ 추가
-from sqlalchemy import asc  # ✅ 추가
-from flask import Blueprint, request, jsonify, current_app, abort , send_file
+import os, base64, uuid, traceback, io
+from uuid import UUID
+from sqlalchemy import asc
+from flask import Blueprint, request, jsonify, current_app, abort, send_file
 from werkzeug.utils import secure_filename
+from PIL import Image  # ⚠️ width/height 계산용
 from src.services import fits_service
-from ..model import db
-from ..model.models import PreviewImage, FileStorage
+from ..models import db, PreviewImage, FileStorage
 
 fits_bp = Blueprint("fits", __name__)
 
@@ -16,7 +16,7 @@ ALLOWED_EXT = {".fits", ".fts", ".fit"}
 def _b64(png: bytes) -> str:
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
-def _uploads_dir() -> str:
+def _uploads_dir() -> str:                                          
     root = current_app.root_path
     updir = os.path.join(root, "..", "uploads")
     updir = os.path.abspath(updir)
@@ -54,8 +54,15 @@ def upload():
         path = os.path.join(upload_dir, unique)
         f.save(path)
 
+        # 등록
         file_id, shape, header = fits_service.register_fits(path)
-        png, w, h = fits_service.load_preview(file_id, percent_clip=1.0, apply_correction=False)
+
+        # ⚠️ A방법: 새 함수명 사용(load_preview → load_preview_bytes)
+        png_bytes = fits_service.load_preview_bytes(file_id)
+
+        # ⚠️ width/height가 필요한 UI를 위해 PIL로 계산
+        with Image.open(io.BytesIO(png_bytes)) as im:
+            w, h = im.size
 
         return jsonify({
             "file_id": file_id,
@@ -63,7 +70,7 @@ def upload():
             "saved_as": unique,
             "shape": list(shape) if shape else None,
             "header": header,
-            "preview_png": _b64(png),
+            "preview_png": _b64(png_bytes),
             "width": w,
             "height": h,
         })
@@ -72,30 +79,6 @@ def upload():
             "error": f"업로드 실패: {type(e).__name__}: {e}",
             "trace": traceback.format_exc(limit=3),
         }), 500
-
-@fits_bp.route("/preview", methods=["GET"], endpoint="preview")
-def preview_by_file():
-    file_id = request.args.get("file_id")
-    z = request.args.get("z", type=int)
-    percent_clip = request.args.get("percent_clip", default=1.0, type=float)
-    apply_correction = request.args.get("apply_correction", default="true").lower() == "true"
-    if not file_id:
-        return jsonify({"error": "file_id가 필요합니다"}), 400
-    try:
-        png, w, h = fits_service.load_preview(
-            file_id, z=z, percent_clip=percent_clip, apply_correction=apply_correction
-        )
-        # ✅ 메타 함께 내려주기 (mainViewer.js의 refreshPreview에서 사용)
-        meta = fits_service.get_meta(file_id)
-        return jsonify({
-            "preview_png": _b64(png),
-            "width": w,
-            "height": h,
-            "filename": os.path.basename(meta.get("path") or "") or meta.get("header", {}).get("FILENAME"),
-            "header": meta.get("header") or {},
-        })
-    except Exception as e:
-        return jsonify({"error": f"프리뷰 실패: {type(e).__name__}: {e}"}), 500
 
 @fits_bp.get("/preview/<preview_id_hex>", endpoint="preview_image")
 def preview_image(preview_id_hex: str):
@@ -121,7 +104,7 @@ def frames(fits_id_hex: str):
     rows = (
         db.session.query(PreviewImage)
         .filter(PreviewImage.fits_id==fid, PreviewImage.image_kind=="FRAME")
-        .order_by(asc(PreviewImage.frame_index))  # ✅ asc import 추가
+        .order_by(asc(PreviewImage.frame_index))
         .all()
     )
 
@@ -148,6 +131,7 @@ def slit():
     if not file_id or x is None:
         return jsonify({"error": "file_id, x 가 필요합니다"}), 400
     try:
+        # 기존 이름 유지(get_slit_image) → 서비스가 지원
         png, w, h = fits_service.get_slit_image(
             file_id, x, percent_clip=percent_clip, apply_correction=apply_correction
         )
@@ -164,6 +148,7 @@ def spectrum():
     if not file_id or x is None or y is None:
         return jsonify({"error": "file_id, x, y 가 필요합니다"}), 400
     try:
+        # 기존 이름 유지(get_spectrum) → 서비스가 지원
         lam, spec = fits_service.get_spectrum(file_id, x, y, apply_correction=apply_correction)
         return jsonify({
             "wavelength": lam.tolist(),
@@ -173,3 +158,4 @@ def spectrum():
         })
     except Exception as e:
         return jsonify({"error": f"스펙트럼 추출 실패: {type(e).__name__}: {e}"}), 500
+
